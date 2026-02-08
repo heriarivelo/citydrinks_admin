@@ -1,0 +1,13 @@
+.header {
+  padding: 16px 32px 12px;
+  background: vaR(--white);
+
+  h2 {
+    color: var(--neutral-500);
+    text-transform: uppercase;
+
+    span {
+      color: var(--neutral-300);
+    }
+  }
+}

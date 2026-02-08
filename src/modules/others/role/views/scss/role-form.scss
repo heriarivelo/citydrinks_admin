@@ -1,0 +1,40 @@
+.role-form {
+  position: relative;
+  .role-header {
+    padding: 12px 24px;
+    background: var(--neutral-200);
+    border-radius: 4px 4px 0 0;
+    input {
+      background: none;
+      border: none;
+      padding: 0;
+    }
+  }
+
+  .role-content {
+    .content-item {
+      border: 1px solid var(--neutral-300);
+      border-bottom: none;
+      padding: 10px 23px;
+
+      &:last-child {
+        border-bottom: 1px solid var(--neutral-300);
+      }
+    }
+
+    .role-selected {
+      padding: 12px 24px;
+      border-radius: 4px 4px 0 0;
+
+      .selected-item {
+        background: var(--neutral-100);
+        border-radius: 100px;
+        padding: 3px 4px 3px 10px;
+      }
+    }
+  }
+
+  .action {
+    margin-top: 32px;
+  }
+}

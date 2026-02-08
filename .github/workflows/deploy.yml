@@ -1,0 +1,99 @@
+name: Deploy Project
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - stage
+
+jobs:
+  deploy-main:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Copy SSH key
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Create or Update .env file on server
+        run: |
+          ssh -o StrictHostKeyChecking=no root@91.199.179.29 << EOF
+            cat <<EOT > /var/www/warehouse-front-admin/Warehouse-2-admin/.env
+            VITE_API_BASE_URL=https://api.citydrinks.be/api/
+            VITE_BASE_URL=https://api.citydrinks.be/
+            VITE_STORAGE_IMAGE_BASE_URL=https://api.citydrinks.be/public
+            VITE_IMAGE_BASE_URL=https://api.citydrinks.be/public/
+            EOT
+          EOF
+
+      - name: Run update script on server
+        run: ssh -o StrictHostKeyChecking=no root@91.199.179.29 'cd /var/www/warehouse-front-admin/Warehouse-2-admin/ && sh update.sh'
+
+      - name: Run deploy script on server
+        run: ssh -o StrictHostKeyChecking=no root@91.199.179.29 'cd /var/www/warehouse-front-admin/Warehouse-2-admin/ && sh deploy.sh'
+
+  deploy-dev:
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Copy SSH key
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Create or Update .env file on server
+        run: |
+          ssh -o StrictHostKeyChecking=no root@91.199.179.29 << EOF
+            cat <<EOT > /var/www/warehouse-front-admin-dev/Warehouse-2-admin/.env
+            VITE_API_BASE_URL=https://api-dev.citydrinks.be/api/
+            VITE_BASE_URL=https://api-dev.citydrinks.be/
+            VITE_STORAGE_IMAGE_BASE_URL=https://api-dev.citydrinks.be/public
+            VITE_IMAGE_BASE_URL=https://api-dev.citydrinks.be/public/
+            EOT
+          EOF
+
+      - name: Run update script on server
+        run: ssh -o StrictHostKeyChecking=no root@91.199.179.29 'cd /var/www/warehouse-front-admin-dev/Warehouse-2-admin/ && sh update.sh ${{ github.ref_name }}'
+
+      - name: Run deploy script on server
+        run: ssh -o StrictHostKeyChecking=no root@91.199.179.29 'cd /var/www/warehouse-front-admin-dev/Warehouse-2-admin/ && sh deploy.sh ${{ github.ref_name }}'
+
+  deploy-stage:
+    if: github.ref == 'refs/heads/stage'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Copy SSH key
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Create or Update .env file on server
+        run: |
+          ssh -o StrictHostKeyChecking=no root@91.199.179.29 << EOF
+            cat <<EOT > /var/www/stage/.env
+            VITE_API_BASE_URL=https://api-stage.citydrinks.be/api/
+            VITE_BASE_URL=https://api-stage.citydrinks.be/
+            VITE_STORAGE_IMAGE_BASE_URL=https://api-stage.citydrinks.be/public
+            VITE_IMAGE_BASE_URL=https://api-stage.citydrinks.be/public/
+            EOT
+          EOF
+
+      - name: Run update script on server
+        run: ssh -o StrictHostKeyChecking=no root@91.199.179.29 'cd /var/www/stage/ && sh update.sh ${{ github.ref_name }}'
+
+      - name: Run deploy script on server
+        run: ssh -o StrictHostKeyChecking=no root@91.199.179.29 'cd /var/www/stage/ && sh deploy.sh ${{ github.ref_name }}'

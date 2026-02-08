@@ -1,0 +1,191 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /*global*/
+  --white: white;
+  --black: black;
+  --gray-300: #616060;
+  --gray-200: #919191;
+  --gray-100: #dedede;
+  --gray-50: #f5f5f5;
+  --status: #f49720;
+  --status-1: #ffe49d;
+
+  /*primary*/
+  --primary-900: #020356;
+  --primary-800: #040468;
+  --primary-700: #060781;
+  --primary-600: #090b9a;
+  --primary-500: #3f41d2;
+  --primary-400: #6768e8;
+  --primary-300: #6768e8;
+  --primary-200: #9b9df7;
+  --primary-100: #cccdfb;
+
+  /*neutral*/
+  --neutral-900: #040829;
+  --neutral-800: #0c123e;
+  --neutral-700: #1a245b;
+  --neutral-600: #212d71;
+  --neutral-500: #2d3d8c;
+  --neutral-400: #46559a;
+  --neutral-300: #a9b7ee;
+  --neutral-200: #dee4f8;
+  --neutral-100: #f1f4ff;
+
+  /*success*/
+  --success-900: #002f4a;
+  --success-800: #004159;
+  --success-700: #005a6f;
+  --success-600: #007785;
+  --success-500: #00989b;
+  --success-400: #30c3b9;
+  --success-300: #5ae1cc;
+  --success-200: #93f5dd;
+  --success-100: #c8fae9;
+
+  /*warning*/
+  --warning-900: #620513;
+  --warning-800: #770911;
+  --warning-700: #94100f;
+  --warning-600: #a50707;
+  --warning-500: #c00707;
+  --warning-400: #e33737;
+  --warning-300: #f07575;
+  --warning-200: #faa5a5;
+  --warning-100: #fcd1d1;
+}
+
+/* *,
+*::before,
+*::after {
+    color: var(--neutral-400);
+} */
+
+a {
+  text-decoration: none;
+}
+
+input {
+  outline: none;
+  border: none;
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 239 62% 54%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 34 91% 54%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 0, 0%, 58%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 0, 0%, 58%;
+    --destructive: 0 93% 39%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 0 0% 57%;
+    --input: 0 0% 57%;
+    --ring: 239 89% 32%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  h1,
+  .h1 {
+    font-family: Roboto, serif;
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 32px;
+    color: var(--neutral-400);
+  }
+
+  h2,
+  .h2 {
+    font-family: Roboto, serif;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 21px;
+    color: var(--neutral-400);
+  }
+
+  h3,
+  .h3 {
+    font-family: Roboto, serif;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 22px;
+    color: var(--neutral-400);
+    letter-spacing: 0.15px;
+  }
+
+  .body-text {
+    font-family: Roboto, serif;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 22px;
+    color: var(--neutral-400);
+    letter-spacing: 0.15px;
+  }
+
+  .body-text-2 {
+    font-family: Roboto, serif;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 18px;
+    color: var(--neutral-400);
+  }
+
+  .subtitle {
+    font-family: Roboto, serif;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 14px;
+    color: var(--neutral-400);
+  }
+
+  /*new*/
+  .subtitle-2 {
+    font-family: Roboto, serif;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 14px;
+    color: var(--neutral-400);
+  }
+
+  .chip {
+    font-family: Roboto, serif;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 18px;
+    color: var(--neutral-400);
+    letter-spacing: 0.16px;
+  }
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 9px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--neutral-300);
+  border: 3px solid var(--white);
+  background-clip: padding-box;
+  border-radius: 9999px;
+}

@@ -1,0 +1,74 @@
+.auth-section {
+  width: 100%;
+  min-height: 100vh;
+  background: url('@/assets/images/png/auth-bg.png') center/cover no-repeat
+    #0d0fb4;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  .auth {
+    max-width: 451px;
+    width: 100%;
+    @media screen and (max-width: 920px) {
+      max-width: 300px;
+    }
+    h1 {
+      color: var(--white);
+    }
+    h3 {
+      color: white;
+      margin-bottom: 10px;
+    }
+    form {
+      fieldset:not(:last-of-type) {
+        margin-bottom: 28px;
+      }
+      .forget-remember {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        margin-top: 12px;
+        @media screen and (max-width: 920px) {
+          margin-top: 12px;
+        }
+        a {
+          color: var(--white);
+        }
+        label {
+          display: flex;
+          align-items: center;
+          color: var(--white);
+          position: relative;
+          cursor: pointer;
+          padding-left: 20px;
+          input {
+            width: 12px;
+            height: 12px;
+            left: 0;
+            position: absolute;
+          }
+        }
+      }
+      .send-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        text-decoration: underline;
+        padding: 0;
+        margin-top: 30px;
+      }
+      button {
+        cursor: pointer;
+        background: var(--status);
+        text-align: center;
+        padding: 12px 0;
+        margin: 32px 0 0;
+        border: none;
+        border-radius: 100px;
+        color: var(--white);
+      }
+    }
+  }
+}

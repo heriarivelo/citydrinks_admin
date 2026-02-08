@@ -1,0 +1,79 @@
+fieldset {
+  position: relative;
+  label {
+    position: relative;
+    display: block;
+  }
+  label {
+    input:focus-visible + .placeholder,
+    input:not(:placeholder-shown) + .placeholder {
+      display: none;
+    }
+    .placeholder {
+      position: absolute;
+      display: block;
+      top: 50%;
+      transform: translateY(-50%);
+      left: 20px;
+      pointer-events: none;
+    }
+  }
+  .error-text {
+    padding: 4px 10px;
+    color: var(--white);
+    background: var(--warning-400);
+    border-radius: 4px;
+    position: absolute;
+    width: 100%;
+    left: 0;
+    bottom: calc(100% + 14px);
+
+    &:before {
+      content: '';
+      position: absolute;
+      bottom: -17px;
+      left: 8px;
+      transform: translateY(-50%);
+      border-left: 7px solid transparent;
+      border-right: 7px solid transparent;
+      border-top: 12px solid var(--warning-400);
+    }
+  }
+  &.auth {
+    border: none;
+    width: 100%;
+    padding: 0;
+
+    legend {
+      color: #f5f9ff;
+      margin-bottom: 4px;
+    }
+
+    &.error input {
+      outline: 1px solid var(--error);
+    }
+
+    label {
+      width: 100%;
+      input {
+        width: 100%;
+        padding: 10px 20px;
+        color: var(--black);
+        border-radius: 4px;
+        border: none;
+
+        &::placeholder {
+          color: var(--gray-200);
+        }
+      }
+
+      .show-hide {
+        cursor: pointer;
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        right: 14px;
+      }
+    }
+  }
+}
