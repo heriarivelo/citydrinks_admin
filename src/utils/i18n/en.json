@@ -318,5 +318,8 @@
   "Waiting": "Waiting",
   "Write_a_category": "Write a category",
   "Write_a_reason": "Write a reason",
-  "Write_a_tariff": "Write a tariff"
+  "Write_a_tariff": "Write a tariff",
+  "Reopen": "Reopen",
+  "Reopen_transfer": "Reopen transfer",
+  "Reason_for_reopen":"Please provide reason to reopen"
 }

@@ -20,64 +20,89 @@ const stockStore = useStockStore()
 const isNewPaymentDialogOpen = ref(0)
 const route = useRoute()
 const router = useRouter()
-const scrollContainerRef = ref<InstanceType<typeof ScrollContainer> | null>(
-  null
-)
+const scrollContainerRef = ref<InstanceType<typeof ScrollContainer> | null>(null)
+
 const paymentType = computed(
   () => route.path.split('/').slice(-2, -1)[0] as PaymentType
 )
 
-const chooseDuration = ref(
-  Array.isArray(route.query.start_date)
-    ? route.query.start_date.join(' to ')
-    : ''
+/**
+ * UIInputDate (flatpickr) affiche/émet "dd-mm-YYYY" (dateFormat: d-m-Y)
+ * Backend/API attend "YYYY-MM-DD" (ISO)
+ */
+const toIsoDate = (dmy: string): string => {
+  const v = String(dmy || '').trim()
+  if (!v) return ''
+  const m = v.match(/^(\d{2})-(\d{2})-(\d{4})$/)
+  if (!m) return ''
+  const [, dd, mm, yyyy] = m
+  return `${yyyy}-${mm}-${dd}`
+}
+
+const toDisplayDate = (iso: string): string => {
+  const v = String(iso || '').trim()
+  if (!v) return ''
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return ''
+  const [, yyyy, mm, dd] = m
+  return `${dd}-${mm}-${yyyy}`
+}
+
+// ✅ States ISO
+const startDate = ref<string>('') // YYYY-MM-DD
+const endDate = ref<string>('') // YYYY-MM-DD
+
+// ✅ Values affichées dans l’input (dd-mm-YYYY)
+const displayStartDate = computed(() =>
+  startDate.value ? toDisplayDate(startDate.value) : ''
+)
+const displayEndDate = computed(() =>
+  endDate.value ? toDisplayDate(endDate.value) : ''
 )
 
 watch(isNewPaymentDialogOpen, (newValue) => {
-  if (newValue) {
-    document.body.style.overflow = 'hidden'
-  } else {
-    document.body.style.overflow = ''
-  }
+  document.body.style.overflow = newValue ? 'hidden' : ''
 })
 
 const params = computed(() => ({
   page: route.query.page || 1,
   search: route.query.search,
+  // ✅ nouveau standard
   start_date: route.query.start_date,
+  end_date: route.query.end_date,
   ['sort[]']: route.query['sort[]'],
 }))
 
-const {
-  data: paymentsData,
-  isFetching,
-  refetch,
-} = useQuery({
+const { data: paymentsData, isFetching, refetch } = useQuery({
   queryKey: [`payments-${paymentType.value}`, params],
-  queryFn: () =>
-    fetchPayments({ params: params.value, type: paymentType.value }),
+  queryFn: () => fetchPayments({ params: params.value, type: paymentType.value }),
   placeholderData: keepPreviousData,
 })
 
 const pageChange = async (page: number) => {
-  router.push({
-    query: { ...route.query, page },
-  })
+  router.push({ query: { ...route.query, page } })
   scrollContainerRef.value?.scrollToTop()
 }
 
-const updateDate = async (event: string) => {
-  chooseDuration.value = event.split(',').join(' to ')
-  if (event) {
-    const dates = event.split(',')
-    router.push({
-      query: { ...route.query, start_date: dates, page: 1 },
-    })
-  } else {
-    router.push({
-      query: { ...route.query, start_date: undefined, page: 1 },
-    })
-  }
+const pushDateQuery = () => {
+  router.push({
+    query: {
+      ...route.query,
+      page: 1,
+      start_date: startDate.value || undefined,
+      end_date: endDate.value || undefined,
+    },
+  })
+}
+
+const updateStartDate = (value: string) => {
+  startDate.value = toIsoDate(value)
+  pushDateQuery()
+}
+
+const updateEndDate = (value: string) => {
+  endDate.value = toIsoDate(value)
+  pushDateQuery()
 }
 
 const handleSearch = (e: Event) => {
@@ -93,18 +118,30 @@ const debouncedSearch = useDebounceFn((value: string) => {
 
 onMounted(async () => {
   await stockStore.actionGetStocks()
+
+  // ✅ Nouveau format URL: ?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
+  if (typeof route.query.start_date === 'string') {
+    startDate.value = route.query.start_date
+  }
+  if (typeof route.query.end_date === 'string') {
+    endDate.value = route.query.end_date
+  }
+
+  // ✅ Ancien format URL: ?start_date[]=YYYY-MM-DD&start_date[]=YYYY-MM-DD
+  if (Array.isArray(route.query.start_date)) {
+    startDate.value = route.query.start_date[0] || ''
+    endDate.value = route.query.start_date[1] || ''
+  }
 })
 
 watch(paymentType, async () => {
-  if (chooseDuration) {
-    chooseDuration.value = ''
-  }
+  // reset dates quand on change buy/sell
+  startDate.value = ''
+  endDate.value = ''
+
   if (route.query.page !== '1') {
-    router.push({
-      query: { page: 1 },
-    })
-  }
-  if (!chooseDuration && route.query.page === '1') {
+    router.push({ query: { page: 1 } })
+  } else {
     refetch()
   }
 })
@@ -117,22 +154,25 @@ watch(isFetching, () => {
 <template>
   <div class="stock flex h-fit min-h-full flex-col gap-[26px]">
     <div class="header flex justify-between">
-      <UIInputDate
-        mode="range"
-        :placeholder="$t('Choose_duration')"
-        @update:model-value="updateDate"
-        :model-value="chooseDuration"
-      />
+      <div class="flex gap-3">
+        <UIInputDate
+          :placeholder="$t('Start_date')"
+          :model-value="displayStartDate"
+          @update:model-value="updateStartDate"
+        />
+
+        <UIInputDate
+          :placeholder="$t('End_date')"
+          :model-value="displayEndDate"
+          @update:model-value="updateEndDate"
+        />
+      </div>
 
       <div class="flex gap-4">
         <UIInput
           icon="search"
           :placeholder="
-            $t(
-              paymentType === 'buy'
-                ? 'Search_by_Provider'
-                : 'Search_by_Customer'
-            )
+            $t(paymentType === 'buy' ? 'Search_by_Provider' : 'Search_by_Customer')
           "
           :model-value="route.query.search as string"
           @input="handleSearch"
@@ -141,6 +181,7 @@ watch(isFetching, () => {
         <PaymentDialog />
       </div>
     </div>
+
     <ScrollContainer ref="scrollContainerRef" storage-key="buy-payment">
       <UITable>
         <template v-slot:thead>
@@ -149,37 +190,24 @@ watch(isFetching, () => {
             <td>{{ $t('Date') }}</td>
             <td v-if="paymentType === 'buy'">{{ $t('Provider') }}</td>
             <td v-else>{{ $t('Customer') }}</td>
-            <td>
-              {{ $t('Document_Purpose') }}
-            </td>
-            <td v-if="paymentType === 'buy'">
-              {{ $t('Batch_IC') }}
-            </td>
-            <td v-else class="whitespace-nowrap">
-              {{ $t('Order_ID') }}
-            </td>
-            <td>
-              {{ $t('Total_Sum') }}
-            </td>
-            <td>
-              {{ $t('Paid') }}
-            </td>
-            <td>
-              {{ $t('Balance') }}
-            </td>
+            <td>{{ $t('Document_Purpose') }}</td>
+            <td v-if="paymentType === 'buy'">{{ $t('Batch_IC') }}</td>
+            <td v-else class="whitespace-nowrap">{{ $t('Order_ID') }}</td>
+            <td>{{ $t('Total_Sum') }}</td>
+            <td>{{ $t('Paid') }}</td>
+            <td>{{ $t('Balance') }}</td>
             <td class="w-36 text-center">{{ $t('Actions') }}</td>
             <td class="w-10 !px-0"></td>
           </tr>
         </template>
+
         <template v-slot:t-row>
-          <tr
-            v-if="paymentsData?.data?.length"
-            v-for="paymentItem in paymentsData?.data"
-          >
+          <tr v-if="paymentsData?.data?.length" v-for="paymentItem in paymentsData?.data">
             <PaymentItem :payment-item="paymentItem" />
           </tr>
           <NoData v-else />
         </template>
+
         <template v-slot:tfoot>
           <tr>
             <td></td>
@@ -205,6 +233,7 @@ watch(isFetching, () => {
         </template>
       </UITable>
     </ScrollContainer>
+
     <Pagination
       :currentPage="Number(route.query.page) || 1"
       :totalPages="paymentsData?.meta?.last_page"

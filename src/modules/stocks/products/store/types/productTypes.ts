@@ -96,6 +96,26 @@ export type TProduct = {
   price_without_promotion: string
   user_tariff: string
   discount_type: string
+  batchItems?: {
+    data: {
+      id: number
+      lot_number: string
+      quantity: number
+      expiry_date?: string
+      product_id?: number
+    }[]
+  }
+}
+
+export type TBatchItem = {
+  id: number
+  product_id: number
+  quantity: number
+  reserved_quantity: number
+  expiry_date: string
+  available_date: string
+  lot_number: string
+  cost: string
 }
 
 export type TProductErrors = {

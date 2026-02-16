@@ -52,15 +52,17 @@ export const useEmployeeStore = defineStore('employee', {
     async actionDeactivateEmployee(employee: TEmployee) {
       try {
         await this.$axios.patch(`/admin/employers/${employee.id}`, {
-          status: employee.status == 2 ? 1 : 2,
+          status: employee.status == 1 ? 2 : 1,
         })
+        await this.getEmployees()
       } catch (err) {
         console.log(err)
       }
     },
     async actionDeleteById(id: number) {
       try {
-        await this.$axios.delete(`/admin/employers/${id}`, { status: 2 })
+        await this.$axios.delete(`/admin/employers/${id}`)
+        await this.getEmployees()
       } catch (err) {
         console.log(err)
       }

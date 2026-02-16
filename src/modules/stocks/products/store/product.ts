@@ -74,11 +74,16 @@ export const useProductStore = defineStore('product', {
             ...params,
           },
         })
-        const filteredData = data.data.data.filter(
-          (item, index, self) =>
-            index === self.findIndex((t) => t.id === item.id)
-        )
-        this.transferProducts = { data: filteredData }
+        const grouped = data.data.data.reduce((acc, product) => {
+          if (!acc[product.id]) {
+            acc[product.id] = { ...product, batch_items: [] }
+          }
+          acc[product.id].batch_items.push(...product.batch_items)
+          return acc
+        }, {})
+
+        this.transferProducts = { data: Object.values(grouped) }
+        console.log(this.transferProducts, "ito ee")
       } catch (err) {
         console.log(err)
       }

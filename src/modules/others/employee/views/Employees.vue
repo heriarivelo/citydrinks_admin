@@ -127,36 +127,12 @@ onUnmounted(() => {
     <UITable>
       <template v-slot:thead>
         <tr>
-          <UITdSort
-            :columnName="$t('ID')"
-            sortKey="id"
-            :query="query"
-            @sort="handleSortTable"
-          />
-          <UITdSort
-            :columnName="$t('Username')"
-            sortKey="user_name"
-            :query="query"
-            @sort="handleSortTable"
-          />
-          <UITdSort
-            :columnName="$t('Role')"
-            sortKey="role_id"
-            :query="query"
-            @sort="handleSortTable"
-          />
-          <UITdSort
-            :columnName="$t('Phone_Number')"
-            sortKey="phone_number"
-            :query="query"
-            @sort="handleSortTable"
-          />
-          <UITdSort
-            :columnName="$t('Status')"
-            sortKey="status"
-            :query="query"
-            @sort="handleSortTable"
-          />
+          <td>{{$t('ID')}}</td>
+          <td>{{$t('Username')}}</td>
+          <td>{{$t('Role')}}</td>
+          <td>{{$t('Phone_Number')}}</td>
+          <td>{{$t('Address')}}</td>
+          <td class="text-center">{{ $t('Status') }}</td>
           <td>{{ $t('Actions') }}</td>
         </tr>
       </template>
@@ -166,6 +142,7 @@ onUnmounted(() => {
           <td>{{ employee.user_name }}</td>
           <td>{{ employee.role.data.name }}</td>
           <td>{{ employee.phone_number }}</td>
+          <td>{{ employee.address }}</td>
           <td>
             <span class="status" :class="{ active: employee.status == 1 }">
               {{ employee.status == 1 ? 'Active' : 'Deactivated' }}

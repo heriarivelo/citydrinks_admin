@@ -53,7 +53,7 @@ onMounted(async () => {
       class="logo mx-auto mb-4 mt-8"
       @click="clearAllScrollPositions"
     >
-      <img src="../../assets/images/png/sidebar-logo.png" alt="logo" />
+      <img src="../../assets/images/png/sidebar-logo.png" alt="logo" class="w-14 h-14" />
     </RouterLink>
     <ScrollArea class="h-[calc(100dvh-100px)]">
       <div class="menu flex flex-col">

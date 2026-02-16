@@ -57,11 +57,65 @@ const isCreateAutoTransferDialogOpen = ref(false)
 const isSaved = ref(false)
 const dataLoaded = ref(false)
 const queryClient = useQueryClient()
+const asArray = <T = any>(v: any): T[] => (Array.isArray(v) ? v : [])
+const notify = (message: string, type: 'success' | 'warning' = 'success') => {
+  notificationStore.addNotification?.({
+    id: Date.now(),
+    notification: message,
+    type,
+  })
+}
+
+
+const actionDialogOpen = ref(false)
+const selectedRow = ref<boolean[]>([])
+
+const initSelection = () => {
+  selectedRow.value = selectedProducts.value.map(() => false)
+}
+
+const selectedHistoryIds = computed<number[]>(() => {
+  const ids: number[] = []
+  selectedProducts.value.forEach((row, idx) => {
+    if (!selectedRow.value[idx]) return
+    if (row.is_new) return // on ignore les nouvelles lignes non sauvegardées
+    const h = row.history_ids ?? []
+    ids.push(...h)
+  })
+  // distinct
+  return Array.from(new Set(ids))
+})
+
+// const selectedPLCount = computed(() => selectedHistoryIds.value.length)
+const selectedPLCount = computed(() => {
+  let pl = 0
+  selectedProducts.value.forEach((row, idx) => {
+    if (!selectedRow.value[idx]) return
+    if (row.is_new) return
+
+    const qty = Number(row.quantity || 0)
+    const ppp = Number(row.selected_product?.packs_quantity_per_pallet || 0)
+
+    if (ppp > 0 && qty > 0) {
+      pl += Math.ceil(qty / ppp)
+    }
+  })
+  return pl
+})
+
+const resetAndReload = async () => {
+  selectedProducts.value = []
+  deletedItems.value = []
+  dataLoaded.value = false
+  await queryClient.invalidateQueries({ queryKey: ['transfer', id.value] })
+  await loadTransferData()
+}
+
 
 const selectedProducts = ref<
   {
-    quantity: string
-    selected_product: TProduct & { batchItems?: { data: any } }
+    quantity: number | null
+    selected_product: TProduct & { batchItems?: { data: any[] } }
     lot_number: any
     is_new: boolean
     history_ids?: number[]
@@ -73,15 +127,25 @@ const { data: transfer, isLoading } = useQuery({
   queryFn: () => fetchTransfer(id),
 })
 
-const addProduct = () => {
+watch(id, (val) => {
+  console.log('[TRANSFER ID]', val)
+}, { immediate: true })
+
+
+
+const addProduct = async () => {
   modalStore.setIsFormDirty(true)
   modalStore.isFormDialog = true
-  selectedProducts.value.push({
-    quantity: '',
+
+  // Créer la ligne vide
+  const newRow = {
+    quantity: null,
     selected_product: {} as any,
-    lot_number: {} as any,
+    lot_number: null,
     is_new: true,
-  })
+  }
+
+  selectedProducts.value.push(newRow)
 }
 
 const removeProduct = (index: number, isNew: boolean) => {
@@ -114,8 +178,14 @@ const compRelatedProductsQuantityForTheSameProducts = () => {
     }[]
   }[]
 
-  selectedProducts.value.forEach((item) => {
-    if (!item.lot_number.product?.related_products?.length) return
+selectedProducts.value.forEach((item) => {
+  if (
+    !item.lot_number ||
+    !item.lot_number.product ||
+    !item.lot_number.product.related_products?.length
+  ) {
+    return
+  }
 
     const product_id = item.lot_number.product.id
 
@@ -159,30 +229,29 @@ const compRelatedProductsQuantityForTheSameProducts = () => {
 }
 
 const onQuantityChange = (value: string, index: number) => {
-  const availableQuantity =
-    selectedProducts.value[index].lot_number?.available_quantity || 0
-
-  errors.value = {} as TBatchTransferErrors
+const available =
+  selectedProducts.value[index].lot_number?.quantity ?? 0
 
   const numericValue = Number(value)
 
-  if (!value || isNaN(numericValue) || numericValue < 0) {
-    selectedProducts.value[index].quantity = ''
-    errors.value[`quantity_${index}`] = ''
+  errors.value = {} as TBatchTransferErrors
+
+  if (isNaN(numericValue) || numericValue < 0) {
+    selectedProducts.value[index].quantity = null
     return
   }
 
-  if (numericValue > availableQuantity) {
-    selectedProducts.value[index].quantity = String(availableQuantity)
-    errors.value[`quantity_${index}`] = `Max quantity is ${availableQuantity}`
-    modalStore.setIsFormDirty(true)
-    modalStore.isFormDialog = true
+  if (numericValue > available) {
+    selectedProducts.value[index].quantity = available
+    errors.value[`quantity_${index}`] = `Max quantity is ${available}`
   } else {
-    selectedProducts.value[index].quantity = value
-    modalStore.setIsFormDirty(true)
-    modalStore.isFormDialog = true
+    selectedProducts.value[index].quantity = numericValue
   }
+
+  modalStore.setIsFormDirty(true)
+  modalStore.isFormDialog = true
 }
+
 
 const transferMutation = useMutation({
   mutationFn: (params: any) =>
@@ -219,48 +288,29 @@ const submit = async (create_transfer_for_deleted_products: 0 | 1) => {
         quantity: product.quantity,
         lot_number: product.lot_number?.lot_number,
       }))
-      .filter((item) => item.quantity != '0'),
+      .filter((item) => item.quantity != 0),
     create_transfer_for_deleted_products,
   }
 
   transferMutation.mutate(params)
-
-  // const data = await batchStore.updateTransferProducts(
-  //   params,
-  //   modal.value.data.id
-  // )
-  // if (!data.response?.data?.status) {
-  //   await batchStore.actionGetBatchTransferList({
-  //     include: [
-  //       'product',
-  //       'senderStock',
-  //       'receiverStock',
-  //       'senderStockBatchItem',
-  //     ],
-  //   })
-  //   modalStore.setModal({} as TModal)
-  // } else {
-  //   if (!data.response?.data?.errors) {
-  //     errors.value['quantity'] = data.response?.data?.error
-  //     return
-  //   }
-  //   Object.keys(data.response.data.errors).forEach((item, index) => {
-  //     if (index == 0) {
-  //       errors.value[item] = data.response.data.errors[item][0]
-  //         .replace('lot_number', 'lot number')
-  //         .replace('id', 'lot number')
-  //         .replace('quantity', 'quantity')
-  //         .replace('receiver_stock_id', 'receiver stock')
-  //         .replace('sender_stock_id', 'sender stock')
-  //     }
-  //   })
-  // }
 }
 
-const selectProduct = ($event, index) => {
-  selectedProducts.value[index].selected_product = $event
-  selectedProducts.value[index].lot_number = {}
-  selectedProducts.value[index].quantity = ''
+const selectProduct = async (product: TProduct, index: number) => {
+  const row = selectedProducts.value[index]
+  row.selected_product = product
+  row.lot_number = null
+  row.quantity = null
+
+  modalStore.setIsFormDirty(true)
+  modalStore.isFormDialog = true
+
+  // Charger les lots si non existants
+  if (!product.batchItems?.data?.length && stockFrom.value?.id) {
+    const res = await axiosClient.get('/admin/batch_items', {
+      params: { stock_id: stockFrom.value.id, product_ids: product.id }
+    })
+    product.batchItems = { data: res.data.data ?? [] }
+  }
 }
 
 const compStocks = computed(() => {
@@ -278,40 +328,144 @@ const compQuantity = computed(() => {
 })
 
 const loadTransferData = async () => {
-  if (!dataLoaded.value && !isLoading.value) {
-    productStore.$reset()
-    await productStore.actionGetProducts({
-      per_page: 999,
-      'batchItems:available_date': `[lte]${getCurrentDate()}`,
-      include: [`batchItems:criteria(stock_id=${16})`],
+  if (dataLoaded.value || isLoading.value) return
+
+  productStore.$reset()
+
+  // 1️⃣ Charger tous les produits
+  await productStore.actionGetProducts({
+    per_page: 999,
+    'batchItems:available_date': `[lte]${getCurrentDate()}`,
+    include: [],
+  })
+
+  // 2️⃣ Définir stockFrom et stockTo
+  stockFrom.value = stocks.value.find((s) => s.name == modal.value.data.sender) as any
+  stockTo.value = stocks.value.find((s) => s.name == modal.value.data.receiver) as any
+
+  // 3️⃣ Ajouter les produits existants du transfert
+  const productIds: number[] = []
+  for (let i = 0; i < transfer.value.length; i++) {
+    const transferItem = transfer.value[i]
+
+    selectedProducts.value.push({
+      selected_product: transferItem.product,
+      lot_number: transferItem, // temporaire
+      quantity: transferItem.quantity,
+      history_ids: transferItem.history_ids,
+      is_new: false,
     })
 
-    stockFrom.value = stocks.value.filter((item) => {
-      return item.name == modal.value.data.sender
-    })?.[0]
-    stockTo.value = stocks.value.filter((item) => {
-      return item.name == modal.value.data.receiver
-    })?.[0]
-    transfer.value.forEach((transferItem) => {
-      selectedProducts.value.push({
-        selected_product: transferItem.product,
-        lot_number: transferItem,
-        quantity: transferItem.quantity.toString(),
-        history_ids: transferItem.history_ids,
-        is_new: false,
-      })
-    })
-    if (modal.value.data.status === 'approved') {
-      approved.value = true
-      isInitialApproved.value = true
-    }
-    if (modal.value.data.ready_for_transfer) {
-      readyForTransfer.value = true
-      isInitialReadyForTransfer.value = true
-    }
-
-    dataLoaded.value = true
+    productIds.push(transferItem.product.id)
   }
+
+  // 4️⃣ Charger les lots pour tous les produits d'un seul coup
+  if (productIds.length && stockFrom.value?.id) {
+    await loadLotsForProducts(productIds, Number(stockFrom.value.id))
+  }
+
+  // 5️⃣ Définir les états initiaux
+  if (modal.value.data.status === 'approved') {
+    approved.value = true
+    isInitialApproved.value = true
+  }
+  if (modal.value.data.ready_for_transfer) {
+    readyForTransfer.value = true
+    isInitialReadyForTransfer.value = true
+  }
+
+  dataLoaded.value = true
+  initSelection()
+}
+
+const loadLotsForProducts = async (productIds: number[], stockId: number) => {
+  if (!productIds.length || !stockId) return;
+
+  const res = await axiosClient.get('/admin/batch_items', {
+    params: { stock_id: stockId, product_ids: productIds.join(',') },
+  });
+
+  const lots = res.data?.data?.data ?? res.data?.data ?? [];
+
+  productIds.forEach((productId) => {
+    const row = selectedProducts.value.find(p => p.selected_product.id === productId);
+    if (!row) return;
+
+    row.selected_product.batchItems = { data: lots.filter(l => l.product_id === productId) };
+
+    // auto-selection si lot_number existait
+    if (row.lot_number?.lot_number) {
+      const matched = row.selected_product.batchItems.data.find(l => l.lot_number === row.lot_number.lot_number);
+      if (matched) row.lot_number = matched;
+    }
+  });
+};
+
+
+const moveAutoMutation = useMutation({
+  mutationFn: (payload: { group_id: number; history_ids: number[] }) =>
+    axiosClient.post(`/admin/transfer-groups/${payload.group_id}/move-auto`, {
+      history_ids: payload.history_ids,
+    }),
+
+  onSuccess: async () => {
+    await queryClient.invalidateQueries({ queryKey: ['transfer-status'] })
+    await queryClient.invalidateQueries({ queryKey: ['transfer', id.value] })
+    await queryClient.invalidateQueries({ queryKey: ['stocks'] })
+
+    actionDialogOpen.value = false
+    await resetAndReload()
+    initSelection()
+
+    notify('Produits envoyés vers un autre transfert', 'success')
+  },
+
+  onError: (err: any) => {
+    notify(
+      err?.response?.data?.message || 'Erreur lors du déplacement',
+      'warning'
+    )
+  },
+})
+
+
+const deleteSelectedMutation = useMutation({
+  mutationFn: (payload: { group_id: number; history_ids: number[] }) =>
+    axiosClient.post(`/admin/transfer-groups/${payload.group_id}/delete-products`, {
+      history_ids: payload.history_ids,
+    }),
+
+  onSuccess: async () => {
+    await queryClient.invalidateQueries({ queryKey: ['transfer-status'] })
+    await queryClient.invalidateQueries({ queryKey: ['transfer', id.value] })
+    await queryClient.invalidateQueries({ queryKey: ['stocks'] })
+
+    actionDialogOpen.value = false
+    await resetAndReload()
+    initSelection()
+
+    notify('Produits supprimés et remis en stock', 'success')
+  },
+
+  onError: (err: any) => {
+    notify(
+      err?.response?.data?.message || 'Erreur lors de la suppression',
+      'warning'
+    )
+  },
+})
+
+const getExpiryDate = (row: any) => {
+  // cas normal: lot sélectionné (batch item)
+  if (row?.lot_number?.expiry_date) return row.lot_number.expiry_date
+
+  // fallback: ligne de transfert (selon ton API)
+  return (
+    row?.lot_number?.batch_item?.expiry_date ||
+    row?.lot_number?.sender_stock_batch_item?.expiry_date ||
+    row?.lot_number?.expiry_date ||
+    ''
+  )
 }
 
 onMounted(async () => {
@@ -329,6 +483,7 @@ watch(
       stockFrom.value = null
       stockTo.value = null
       selectedProducts.value = []
+      selectedRow.value = []
     }
   }
 )
@@ -371,6 +526,47 @@ onUnmounted(() => {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+    <AlertDialog :open="actionDialogOpen">
+      <AlertDialogContent>
+          <AlertDialogHeader>
+              <AlertDialogTitle>Actions sur les produits sélectionnés</AlertDialogTitle>
+                <AlertDialogDescription class="space-y-2">
+                    <div class="flex gap-2.5 rounded-md border border-secondary py-2 pe-4 ps-3">
+                    <TriangleAlert class="mt-1 shrink-0 text-secondary" stroke-width="2.5" />
+                      <span class="text-justify">
+                        {{ selectedPLCount }} PL sélectionnées.
+                      </span>
+                    </div>
+                    <div class="text-sm text-muted-foreground">
+                      - Envoyer vers un transfert : remplira un transfert ouvert (ready_for_transfer = 0), sinon créera un nouveau.<br />
+                      - Supprimer : remet les produits dans le stock d’origine.
+                    </div>
+                  </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter class="flex gap-2">
+              <Button
+                    @click="moveAutoMutation.mutate({ group_id: id, history_ids: selectedHistoryIds })"
+                    :disabled="moveAutoMutation.isPending.value || selectedHistoryIds.length === 0"
+                  >
+                    Envoyer vers un transfert
+              </Button>
+
+              <Button
+                    variant="destructive"
+                    @click="deleteSelectedMutation.mutate({ group_id: id, history_ids: selectedHistoryIds })"
+                    :disabled="deleteSelectedMutation.isPending.value || selectedHistoryIds.length === 0"
+                  >
+                    Supprimer ces produits
+                </Button>
+
+                  <AlertDialogCancel @click="actionDialogOpen = false">
+                    Annuler
+                  </AlertDialogCancel>
+          </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
     <h1 class="uppercase">
       {{
         modal.data.is_view
@@ -416,10 +612,19 @@ onUnmounted(() => {
           <div
             class="add-products"
             :style="{
-              gridTemplateColumns: `1fr 140px 140px 183px ${modal.data.is_view ? '0' : '32px'}`,
+              gridTemplateColumns: `36px 1fr 140px 140px 183px ${modal.data.is_view ? '0' : '32px'}`,
             }"
             v-for="(product, index) in selectedProducts"
           >
+          <div class="flex items-center justify-center">
+  <input
+    type="checkbox"
+    class="h-4 w-4"
+    :disabled="modal.data.is_view || product.is_new"
+    v-model="selectedRow[index]"
+  />
+</div>
+
             <SearchSelect
               :showFromSelected="true"
               :placeholder="`${$t('Product')} *`"
@@ -434,16 +639,13 @@ onUnmounted(() => {
               :is-form-dialog="true"
             />
             <UIInput
+              type="number"
+              :model-value="product.quantity"
               @update:model-value="onQuantityChange($event, index)"
               @click="errors = {} as TBatchTransferErrors"
               :error="errors[`quantity`] || errors[`quantity_${index}`]"
-              :input-type="focus[index] ? 'number' : 'text'"
               :disabled="!product.selected_product?.id || modal.data.is_view"
-              :model-value="
-                !focus[index] ? compQuantity?.[index] : product.quantity
-              "
-              @update:focus="focus[index] = $event"
-              :placeholder="`${$t('QNT__(Pack)')}`"
+              :placeholder="compQuantity?.[index] || $t('QNT__(Pack)')"
               :is-dirty="true"
               :is-form-dialog="true"
               :error-position="index === 0 ? 'bottom' : 'top'"
@@ -454,8 +656,9 @@ onUnmounted(() => {
               :error="errors[`lot_number`] || errors[`id`]"
               @click="errors = {} as TBatchTransferErrors"
               :data="
-                product.selected_product?.batchItems?.data.filter(
+                asArray(product?.selected_product?.batchItems?.data).filter(
                   (lot) =>
+                    lot.id === product.lot_number?.id ||
                     !selectedProducts.some((p) => p.lot_number?.id === lot.id)
                 )
               "
@@ -467,13 +670,11 @@ onUnmounted(() => {
               :is-dirty="true"
               :is-form-dialog="true"
             />
-            <UIInputDate
-              :disabled="true"
-              :placeholder="`${$t('Expire_Date')} *`"
-              v-model="product.lot_number.expiry_date"
-              :is-dirty="true"
-              :is-form-dialog="true"
-            />
+<UIInputDate
+  :model-value="getExpiryDate(product)"
+  disabled
+  :placeholder="`${$t('Expire_Date')}`"
+/>
             <AlertDialog :open="selectedRemoveProductIndex === index">
               <AlertDialogTrigger as-child>
                 <Button
@@ -521,6 +722,7 @@ onUnmounted(() => {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+
             <div
               class="col-span-2 grid grid-cols-[1fr_140px] gap-4 pb-1"
               v-if="
@@ -614,6 +816,15 @@ onUnmounted(() => {
       </div>
     </div>
     <div class="flex w-full justify-end gap-4">
+      <UIButton
+        v-if="!modal.data.is_view"
+        class="w-[10rem]"
+        type="button"
+        @click="actionDialogOpen = true"
+        :disabled="selectedHistoryIds.length === 0"
+      >
+        Actions ({{ selectedPLCount }} PL)
+      </UIButton>
       <UIButton
         v-if="!modal.data.is_view"
         class="w-[6.375rem]"

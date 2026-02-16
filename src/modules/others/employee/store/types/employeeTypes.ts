@@ -13,6 +13,7 @@ export type TEmployee = {
   user_name: string
   first_name: string
   last_name: string
+  address: string
   one_time_password: any
   status: number
   created_at: string
@@ -41,4 +42,6 @@ export type TEmployeeErrors = {
   company: string
   vat: string
   address: string
+  position?: string
+  status?: string
 }

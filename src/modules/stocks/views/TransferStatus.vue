@@ -32,7 +32,17 @@ dayjs.extend(customParseFormat)
 const modalStore = useModalStore()
 const router = useRouter()
 const open = ref(false)
-const selectedTransferStatus = ref<{ id: number; status: TransferStatus }>(null)
+type TSelectedTransferStatus =
+  | null
+  | { id: number; status: TransferStatus }
+  | { id: number; ready_for_transfer: boolean }
+
+const selectedTransferStatus = ref<TSelectedTransferStatus>(null)
+const reopenDialogOpen = ref(false)
+const reopenReason = ref('')
+const reopenTargetId = ref<number | null>(null)
+const reopenError = ref<string | null>(null)
+
 const route = useRoute()
 const chooseDuration = ref('')
 const params = computed(() => ({
@@ -83,25 +93,103 @@ const closeSelect = (event: Event | null = null) => {
   }
 }
 
+const normalizeCheckboxBoolean = (val: unknown): boolean => {
+  if (val === true) return true
+  if (val === false) return false
+  if (val === 'true') return true
+  if (val === 'false') return false
+  if (val === 1) return true
+  if (val === 0) return false
+  if (val === '1') return true
+  if (val === '0') return false
+  // cas "indeterminate" ou autre => on ne change rien
+  return false
+}
+
+
 const transferStatusMutation = useMutation({
-  mutationFn: ({ id, status }: { id: number; status: TransferStatus }) =>
-    axiosClient.put(`/admin/transfers-status/${id}`, {
-      status,
-    }),
+  mutationFn: (payload: Exclude<TSelectedTransferStatus, null>) => {
+    if ('ready_for_transfer' in payload) {
+     return axiosClient.put(
+        `/admin/transfers-status/${payload.id}`,
+        { ready_for_transfer: payload.ready_for_transfer },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+        }
+      )
+    }
+    return axiosClient.put(`/admin/transfers-status/${payload.id}`, {
+      status: payload.status,
+    })
+  },
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ['transfer-status'] })
-    queryClient.invalidateQueries({
-      queryKey: ['stocks'],
-    })
+    queryClient.invalidateQueries({ queryKey: ['stocks'] })
+    selectedTransferStatus.value = null
+  },
+  onError: (err: any) => {
+    // Affiche dans ta UI (toast / modalStore / console)
+    const msg =
+      err?.response?.data?.message ||
+      err?.response?.data?.error ||
+      'Update failed'
+    // exemple minimal :
+    alert(msg)
     selectedTransferStatus.value = null
   },
 })
 
-const updateBatchTransferStatus = () => {
-  transferStatusMutation.mutate({
-    id: selectedTransferStatus.value.id,
-    status: selectedTransferStatus.value.status,
+
+const reopenTransferMutation = useMutation({
+  mutationFn: (payload: { id: number; reason: string }) => {
+    return axiosClient.post(`/admin/transfers/${payload.id}/reopen`, {
+      reason: payload.reason,
+    })
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['transfer-status'] })
+    queryClient.invalidateQueries({ queryKey: ['stocks'] })
+    reopenDialogOpen.value = false
+    reopenReason.value = ''
+    reopenTargetId.value = null
+    reopenError.value = null
+  },
+  onError: (err: any) => {
+    // adapte selon ton format d’erreur
+    reopenError.value =
+      err?.response?.data?.message ||
+      err?.response?.data?.error ||
+      'Failed to reopen transfer'
+  },
+})
+
+const openReopenDialog = (id: number) => {
+  reopenTargetId.value = id
+  reopenReason.value = ''
+  reopenError.value = null
+  reopenDialogOpen.value = true
+}
+
+const submitReopen = () => {
+  if (!reopenTargetId.value) return
+  if (reopenReason.value.trim().length < 5) {
+    reopenError.value = 'Justification is required (min 5 characters).'
+    return
+  }
+  reopenTransferMutation.mutate({
+    id: reopenTargetId.value,
+    reason: reopenReason.value.trim(),
   })
+}
+
+
+const updateBatchTransferStatus = () => {
+  if (!selectedTransferStatus.value) return
+  console.log('ready_for_transfer value:', (selectedTransferStatus.value as any)?.ready_for_transfer, typeof (selectedTransferStatus.value as any)?.ready_for_transfer)
+  transferStatusMutation.mutate(selectedTransferStatus.value)
 }
 
 onMounted(async () => {
@@ -146,6 +234,48 @@ watch(isFetching, () => {
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>
+  <AlertDialog :open="reopenDialogOpen">
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Réouvrir le transfert</AlertDialogTitle>
+        <AlertDialogDescription class="space-y-2">
+          <div class="text-sm">
+            Ce transfert est validé. La réouverture le repassera en <b>correction</b>.
+            Une justification est obligatoire.
+          </div>
+
+          <div class="space-y-2">
+            <textarea
+              v-model="reopenReason"
+              class="w-full min-h-[110px] rounded-md border border-input bg-background p-3 text-sm"
+              placeholder="Ex: Écart réel à l’arrivée du camion..."
+            />
+            <p v-if="reopenError" class="text-sm text-destructive">
+              {{ reopenError }}
+            </p>
+          </div>
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+
+      <AlertDialogFooter>
+        <Button
+          class="w-[6.375rem]"
+          @click="submitReopen"
+          :disabled="reopenTransferMutation.isPending.value"
+        >
+          Réouvrir
+        </Button>
+
+        <AlertDialogCancel
+          class="w-[6.375rem]"
+          @click="reopenDialogOpen = false"
+        >
+          Annuler
+        </AlertDialogCancel>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+
   <div class="transfer flex min-h-full flex-col gap-[26px] px-6 py-5">
     <div class="header flex justify-end">
       <div class="flex gap-4">
@@ -198,53 +328,37 @@ watch(isFetching, () => {
             </td>
             <td class="!pl-0">
               <div class="flex justify-center">
-                <Checkbox
-                  :id="`delivered-${transfer.id}`"
-                  :checked="
-                    transfer.status === 'delivered' ||
-                    transfer.status === 'approved'
-                  "
-                  :disabled="
-                    transfer.status === 'delivered' ||
-                    transfer.status === 'approved'
-                  "
-                  @update:checked="
-                    selectedTransferStatus = {
-                      id: transfer.id,
-                      status: 'delivered',
-                    }
-                  "
-                />
+<Checkbox
+  :id="`delivered-${transfer.id}`"
+  :checked="transfer.status === 'delivered' || transfer.status === 'approved'"
+@update:checked="() => {
+  selectedTransferStatus = { id: transfer.id, status: 'delivered' }
+}"
+/>
               </div>
             </td>
             <td class="!pl-0">
               <div class="flex justify-center">
-                <Checkbox
-                  :id="`approved-${transfer.id}`"
-                  :checked="transfer.status === 'approved'"
-                  :disabled="transfer.status === 'approved'"
-                  @update:checked="
-                    selectedTransferStatus = {
-                      id: transfer.id,
-                      status: 'approved',
-                    }
-                  "
-                />
+<Checkbox
+  :id="`approved-${transfer.id}`"
+  :checked="transfer.status === 'approved'"
+@update:checked="() => {
+  selectedTransferStatus = { id: transfer.id, status: 'approved' }
+}"
+/>
+
               </div>
             </td>
             <td class="!pl-0">
               <div class="flex justify-center">
-                <Checkbox
-                  :id="`ready-for-transfer-${transfer.id}`"
-                  :checked="transfer.ready_for_transfer ? true : false"
-                  :disabled="!!transfer.ready_for_transfer"
-                  @update:checked="
-                    selectedTransferStatus = {
-                      id: transfer.id,
-                      status: 'ready_for_transfer',
-                    }
-                  "
-                />
+<Checkbox
+  :id="`ready-for-transfer-${transfer.id}`"
+  :checked="!!transfer.ready_for_transfer"
+@update:checked="(val: boolean) => {
+  const ready = normalizeCheckboxBoolean(val)
+  selectedTransferStatus = { id: transfer.id, ready_for_transfer: ready }
+}"
+/>
               </div>
             </td>
             <td class="!py-0">
@@ -274,6 +388,7 @@ watch(isFetching, () => {
                 <Button
                   variant="ghost"
                   size="iconMd"
+                  :disabled="transfer.status === 'approved'"
                   :class="
                     cn(
                       'text-[var(--neutral-400)]',
@@ -287,9 +402,19 @@ watch(isFetching, () => {
                       data: transfer,
                     })
                   "
-                  :disabled="transfer.status === 'approved'"
                 >
                   <Pencil />
+                </Button>
+                <Button
+                  v-if="transfer.status === 'approved'"
+                  variant="ghost"
+                  size="iconMd"
+                  class="text-[var(--neutral-400)]"
+                  @click="openReopenDialog(transfer.id)"
+                  title="Réouvrir"
+                >
+                  <!-- tu peux mettre une icône, sinon un texte -->
+                  <span class="text-xs">Reopen</span>
                 </Button>
               </div>
             </td>
